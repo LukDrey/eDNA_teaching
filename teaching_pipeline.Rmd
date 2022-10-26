@@ -1,0 +1,64 @@
+---
+title: "Teaching Pipeline"
+author: "Lukas Dreyling & Henrique Valim"
+date: "2022-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r klippy, echo=FALSE, include=TRUE}
+library(klippy)
+klippy::klippy()
+```
+
+## Program List 
+
+ - guppy (will run internally?)
+ - cutadapt
+ - seqtk (or some other fastq to fasta tool)
+ - blastn 
+ - UNITE database
+ - ITSx to extract ITS from the long reads
+ - maybe RStudio?
+ - R &rarr; packages: vegan, microbiome, ggplot, here, decontam, lulu 
+ - Quiime2? (maybe that can be the full pipeline already?)
+ 
+## Basecalling and Demultiplexing 
+
+### Guppy 
+
+```{bash, eval = F}
+#!/bin/bash
+
+#SBATCH -n 4
+#SBATCH -p gpu
+#SBATCH -t 12:00:00
+#SBATCH -J guppy_gpu
+#SBATCH -o guppy_gpu.o%j
+#SBATCH -e guppy_gpu.e%j
+
+module load guppy
+
+cd $SLURM_SUBMIT_DIR
+
+guppy_basecaller -i fast5_pass -s fastq_9.4_pass -c dna_r9.4.1_450bps_hac.cfg -x "cuda:1" --barcode_kits SQK-RBK001
+guppy_basecaller -i fast5_skip -s fastq_9.4_skip -c dna_r9.4.1_450bps_hac.cfg -x "cuda:1" --barcode_kits SQK-RBK001
+
+scontrol show job $SLURM_JOB_ID
+
+```
+
+- barcode removal is on by default if using the demultiplexing flag 
+
+## Adapter removal
+
+### Cutadapt 
+
+```{bash, eval = F}
+
+```
+
+## Convert fastq file to fasta
