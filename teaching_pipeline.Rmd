@@ -16,16 +16,17 @@ klippy::klippy()
 
 ## Program List 
 
- - guppy (will run internally?)
- - cutadapt
- - seqtk (or some other fastq to fasta tool)
- - blastn 
- - UNITE database
- - ITSx to extract ITS from the long reads
- - maybe RStudio?
- - R &rarr; packages: vegan, microbiome, ggplot, here, decontam, lulu 
- - Quiime2? (maybe that can be the full pipeline already?)
- 
+ * guppy (will run internally?)
+    + already demultiplexes and filters low quality reads
+ * Decona pipeline
+    + CD-Hit &rarr; clustering Reads 
+    + Minimap2 &rarr; align reads
+    + Racon &rarr; make consensus sequences
+    + Medaka &rarr; plosih the sequences
+ * Blast+
+ * R (and RStudio)
+    + packages: vegan, microbiome, ggplot, here 
+    
 ## Basecalling and Demultiplexing 
 
 ### Guppy 
@@ -51,14 +52,166 @@ scontrol show job $SLURM_JOB_ID
 
 ```
 
-- barcode removal is on by default if using the demultiplexing flag 
+- barcode removal is on by default if using the demultiplexing flag (--barcode_kits)
 
-## Adapter removal
+## Turn Fastq to Fasta
 
-### Cutadapt 
-
-```{bash, eval = F}
-
+ * later we need the reads in fasta format so we need to convert 
+```{}
+echo "Fastq reads are being transformed to fasta" ;
+            for i in *.fastq ;  do
+            if [ -e "$i" ] ; then
+            cat "$i" | grep -A 1 'runid' | sed '/^--$/d' | sed 's/^@/>/' | awk '{print $1}' > "${i%%.*}.fasta" ;
+            fi
+            done
 ```
 
-## Convert fastq file to fasta
+## Clustering the Reads
+
+ * to obtain groups of similar reads 
+ * potentially the same species/OTU
+ * CD-Hit
+ 
+```{}
+# Clustering reads to make a list of most abundant, representative reads
+echo "Clustering reads..." ;
+for folder in */ ; do
+if ! [ "$folder" == "XXXXXX/" ] ; then
+(
+cd "$folder" || exit ;
+echo "Clustering $folder..." ;
+
+    for fasta in *.fasta ; do
+    if [ -e "$fasta" ] ; then
+    # This is the actual clustering command
+    cd-hit-est -i "$fasta" -o cluster_representatives -c $CLUSTERING -n "$WORDLENGTH" -d 0 -M 0 -T "$MULTITHREAD" -g "$CLUSTprog" > report_"${fasta%.*}.txt";
+    mv cluster_representatives cluster_representatives.fa
+    # Read distribution will be summarized in report_***.txt within the folder.
+    plot_len1.pl *.clstr \
+    1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999,1000-1999,2000-4999,5000-9999,10000-100000  \ >> size_report_"$fasta".txt ;
+    # Create files with clusters of a certain size
+    make_multi_seq.pl *.fasta *.clstr multi-seq "$CLUSTERSIZE" ;
+    fi
+    done
+)
+fi
+done
+echo "Clustering complete." ;
+```
+
+## Align clustered Reads
+
+```{}
+# Allign with minimap2 and assemble with Racon
+for folder in */ ; do
+if [ -e "$folder"/multi-seq ] ; then
+(
+cd "$folder"/"multi-seq" || exit ;
+
+    for file in * ;  do
+    if [ -e "${file}" ] ; then
+    #Rename extensionless fasta files: sequencecount-clustername.fa
+        if [ "${file}" == "*.*" ];
+        then
+        continue;
+        else
+        seq="$(cat "${file}" | grep ">" | wc -l)"
+        mv "${file}" "$seq-${file}.fa"
+        fi;
+    fi
+    done
+    # # -------------------------- # #
+    # # Subsampling large datasets # #
+        if ! [ "$CLUSTERmax" = "no" ] ; then
+        for file in *.fa ;  do
+        awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);} END {printf("\n");}' < "${file}" | awk 'NR>1{ printf("%s",$0); n++; if(n%2==0) { printf("\n");} else { printf("\t");} }' | awk -v k="$CLUSTERmax" 'BEGIN{srand(systime() + PROCINFO["pid"]);}{s=x++<k?x-1:int(rand()*x);if(s<k)R[s]=$0}END{for(i in R)print R[i]}' | awk -F"\t" '{print $1"\n"$2 > "'"subsampled_"$CLUSTERmax"-${file}"'"}'
+            for file in subsampled_*.fa ;  do
+            if [ -e "${file}" ] ; then
+            echo "Aligning and making draft assembly of $file...";
+            # Extract 1st fasta of each file as a reference point
+            tail -n 2 "${file}" > ref_"${file}"sta;
+            # Aligning all data in the cluster to the reference sequence
+            minimap2 -ax map-ont -k"$Kmer" ref_"${file}"sta "${file}" -t "$MULTITHREAD" > align_"${file}".sam ;
+
+            #Assemble the clustered sequences.
+            # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
+            racon -m 8 -x -6 -g -8 -w 500 -t "$MULTITHREAD" "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
+            fi
+            done
+        done
+        fi
+    # # ------------------------------- # #
+
+    if [ "$CLUSTERmax" = "no" ] ; then
+        for file in *.fa ;  do
+        if [ -e "${file}" ] ; then
+        echo "Aligning and making draft assembly of $file...";
+        # Extract 1st fasta of each file as a reference point
+        tail -n 2 "${file}" > ref_"${file}"sta;
+        # Aligning all data in the cluster to the reference sequence
+        minimap2 -ax map-ont -k"$Kmer" ref_"${file}"sta "${file}" -t "$MULTITHREAD" > align_"${file}".sam ;
+
+        #Assemble the clustered sequences.
+        # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
+        racon -m 8 -x -6 -g -8 -w 500 -t "$MULTITHREAD" "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
+        fi
+        done
+    fi
+    echo "Done";
+)
+fi
+done
+```
+
+## Polishing with Medaka
+
+```{}
+if [ $MEDAKA == "yes" ] ; then
+    #Polish the Racon secuence with Medaka
+    for folder in */ ; do
+    if [ -e "$folder"/multi-seq ] ; then
+    (
+    cd "$folder"/"multi-seq" || exit ;
+        for fa in *.fa ;  do
+        if [ -e "polished_${fa}sta" ] ; then
+        echo "polishing ${fa} Racon sequence with Medaka..."
+        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o "consensus_medaka_${fa}" -t "$MULTITHREAD" ;
+        fi
+        done
+    echo "Done polishing ${fa}";
+    )
+    fi
+    done
+
+    #Change names of Medaka consensus to have their cluster's name
+    #move them one folder up
+    for folder in */ ; do
+    if [ -e "${folder}"/multi-seq ] ; then
+    (
+    cd "${folder}"/"multi-seq" || exit ;
+    for folders in consensus_medaka_*; do
+    if [ -e "${folders}" ] ; then
+    (
+        cd "${folders}" || exit ;
+        [ ! -f consensus.fasta ] || mv consensus.fasta "${folders}sta"
+        [ ! -f "${folders}sta" ] || mv "${folders}sta" ..
+    )
+    fi
+    done
+    )
+    fi
+    done
+```
+
+## Blast search against UNITE database
+
+```{}
+blastn -db ASVs_bacteria.fa \
+-outfmt '6 qseqid sseqid pident' \
+-out match_list_bacteria.txt \
+-qcov_hsp_perc 80 \
+-perc_identity 84 \
+-num_threads 20 \
+-query ASVs_bacteria.fa
+```
+

@@ -537,30 +537,92 @@ pre code {
 <div id="program-list" class="section level2">
 <h2>Program List</h2>
 <ul>
-<li>guppy (will run internally?)</li>
-<li>cutadapt</li>
-<li>seqtk (or some other fastq to fasta tool)</li>
-<li>blastn</li>
-<li>UNITE database</li>
-<li>ITSx to extract ITS from the long reads</li>
-<li>maybe RStudio?</li>
-<li>R → packages: vegan, microbiome, ggplot, here, decontam, lulu</li>
-<li>Quiime2? (maybe that can be the full pipeline already?)</li>
+<li>guppy (will run internally?)
+<ul>
+<li>already demultiplexes and filters low quality reads</li>
+</ul></li>
+<li>Decona pipeline
+<ul>
+<li>CD-Hit → clustering Reads</li>
+<li>Minimap2 → align reads</li>
+<li>Racon → make consensus sequences</li>
+<li>Medaka → plosih the sequences</li>
+</ul></li>
+<li>Blast+</li>
+<li>R (and RStudio)
+<ul>
+<li>packages: vegan, microbiome, ggplot, here</li>
+</ul></li>
 </ul>
 </div>
 <div id="basecalling-and-demultiplexing" class="section level2">
 <h2>Basecalling and Demultiplexing</h2>
 <div id="guppy" class="section level3">
 <h3>Guppy</h3>
-<pre class="bash"><code>guppy_basecaller --input_path &lt;folder containing .fast5 or .pod5 files&gt; --save_path &lt;output folder&gt; --config dna_r9.4.1_450bps_fast.cfg --barcode_kits SQK-RBK001</code></pre>
+<pre class="bash"><code>#!/bin/bash
+
+#SBATCH -n 4
+#SBATCH -p gpu
+#SBATCH -t 12:00:00
+#SBATCH -J guppy_gpu
+#SBATCH -o guppy_gpu.o%j
+#SBATCH -e guppy_gpu.e%j
+
+module load guppy
+
+cd $SLURM_SUBMIT_DIR
+
+guppy_basecaller -i fast5_pass -s fastq_9.4_pass -c dna_r9.4.1_450bps_hac.cfg -x &quot;cuda:1&quot; --barcode_kits SQK-RBK001
+guppy_basecaller -i fast5_skip -s fastq_9.4_skip -c dna_r9.4.1_450bps_hac.cfg -x &quot;cuda:1&quot; --barcode_kits SQK-RBK001
+
+scontrol show job $SLURM_JOB_ID
+</code></pre>
+<ul>
+<li>barcode removal is on by default if using the demultiplexing flag
+(–barcode_kits)</li>
+</ul>
 </div>
 </div>
-<div id="adapter-removal" class="section level2">
-<h2>Adapter removal</h2>
-<div id="cutadapt" class="section level3">
-<h3>Cutadapt</h3>
-<pre class="bash"><code></code></pre>
+<div id="turn-fastq-to-fasta" class="section level2">
+<h2>Turn Fastq to Fasta</h2>
+<ul>
+<li></li>
+</ul>
+<pre><code> for fastq in *.fastq ; do
+cat *.fastq | \
+awk &#39;{if(NR%4==1) {printf(&quot;&gt;%s\n&quot;,substr($0,2));} else if(NR%4==2) print;}&#39; &gt; fastq.fasta;
+done</code></pre>
 </div>
+<div id="clustering-the-reads" class="section level2">
+<h2>Clustering the Reads</h2>
+<ul>
+<li>to obtain groups of similar reads</li>
+<li>potentially the same species/OTU</li>
+</ul>
+<pre><code># Clustering reads to make a list of most abundant, representative reads
+echo &quot;Clustering reads...&quot; ;
+for folder in */ ; do
+if ! [ &quot;$folder&quot; == &quot;XXXXXX/&quot; ] ; then
+(
+cd &quot;$folder&quot; || exit ;
+echo &quot;Clustering $folder...&quot; ;
+
+    for fasta in *.fasta ; do
+    if [ -e &quot;$fasta&quot; ] ; then
+    # This is the actual clustering command
+    cd-hit-est -i &quot;$fasta&quot; -o cluster_representatives -c $CLUSTERING -n &quot;$WORDLENGTH&quot; -d 0 -M 0 -T &quot;$MULTITHREAD&quot; -g &quot;$CLUSTprog&quot; &gt; report_&quot;${fasta%.*}.txt&quot;;
+    mv cluster_representatives cluster_representatives.fa
+    # Read distribution will be summarized in report_***.txt within the folder.
+    plot_len1.pl *.clstr \
+    1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999,1000-1999,2000-4999,5000-9999,10000-100000  \ &gt;&gt; size_report_&quot;$fasta&quot;.txt ;
+    # Create files with clusters of a certain size
+    make_multi_seq.pl *.fasta *.clstr multi-seq &quot;$CLUSTERSIZE&quot; ;
+    fi
+    done
+)
+fi
+done
+echo &quot;Clustering complete.&quot; ;</code></pre>
 </div>
 
 
