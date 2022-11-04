@@ -27,8 +27,6 @@ klippy::klippy()
  * R (and RStudio)
     + packages: vegan, microbiome, ggplot, here 
     
-    change
-    
 ## Basecalling and Demultiplexing 
 
 ### Guppy 
@@ -56,11 +54,11 @@ scontrol show job $SLURM_JOB_ID
 
 - barcode removal is on by default if using the demultiplexing flag (--barcode_kits)
 
-## Turn Fastq to Fasta
+# Turn Fastq to Fasta
 
-# We want to create a folder where we can store the FASTA files and need to unzip the FASTQ files. 
+### We want to create a folder where we can store the FASTA files and need to unzip the FASTQ files. 
 
-```{}
+```{bash}
 mkdir ./fasta_pass
 
 cd fastq_pass 
@@ -72,7 +70,7 @@ cd ..
 
 
  * later we need the reads in fasta format so we need to convert 
-```{}
+```{bash}
 # enter the folder where the .fastq files are stored.
 cd fastq_pass
 
@@ -96,7 +94,7 @@ cd ..
  * potentially the same species/OTU
  * CD-Hit
  
-```{}
+```{bash}
 # Enter the folder where we stored the .fasta files
 cd fasta_pass
 
@@ -118,7 +116,7 @@ cd fasta_pass
 
 ## Align clustered Reads
 
-```{}
+```{bash}
 # Allign with minimap2 and assemble with Racon
 for folder in */ ; do
 if [ -e "$folder"/multi-seq ] ; then
@@ -182,7 +180,7 @@ done
 
 ## Polishing with Medaka
 
-```{}
+```{bash}
 if [ $MEDAKA == "yes" ] ; then
     #Polish the Racon secuence with Medaka
     for folder in */ ; do
@@ -222,7 +220,7 @@ if [ $MEDAKA == "yes" ] ; then
 
 ## Blast search against UNITE database
 
-```{}
+```{bash}
 blastn -db ASVs_bacteria.fa \
 -outfmt '6 qseqid sseqid pident' \
 -out match_list_bacteria.txt \
