@@ -58,14 +58,36 @@ scontrol show job $SLURM_JOB_ID
 
 ## Turn Fastq to Fasta
 
+# We want to create a folder where we can store the FASTA files and need to unzip the FASTQ files. 
+
+```{}
+mkdir ./fasta_pass
+
+cd fastq_pass 
+
+gzip -d fastq_pass/*.gz
+
+cd .. 
+```
+
+
  * later we need the reads in fasta format so we need to convert 
 ```{}
-echo "Fastq reads are being transformed to fasta" ;
-            for i in *.fastq ;  do
+# enter the folder where the .fastq files are stored.
+cd fastq_pass
+
+# Turn all .fastq files inside the folder into .fasta files
+for i in *.fastq ;  do
             if [ -e "$i" ] ; then
-            cat "$i" | grep -A 1 'runid' | sed '/^--$/d' | sed 's/^@/>/' | awk '{print $1}' > "${i%%.*}.fasta" ;
+            cat "$i" | grep -A 1 'runid' | sed '/^--$/d' | sed 's/^@/>/' | awk '{print $1}' > "${i%%.*}.fasta" ; 
             fi
             done
+
+# Move the .fasta files to the folder we created before.
+mv ./*.fasta ../fasta_pass
+
+# Exit the fastq_pass folder 
+cd .. 
 ```
 
 ## Clustering the Reads
@@ -75,18 +97,14 @@ echo "Fastq reads are being transformed to fasta" ;
  * CD-Hit
  
 ```{}
-# Clustering reads to make a list of most abundant, representative reads
-echo "Clustering reads..." ;
-for folder in */ ; do
-if ! [ "$folder" == "XXXXXX/" ] ; then
-(
-cd "$folder" || exit ;
-echo "Clustering $folder..." ;
+# Enter the folder where we stored the .fasta files
+cd fasta_pass
 
+# Clustering reads to make a list of most abundant, representative reads
     for fasta in *.fasta ; do
     if [ -e "$fasta" ] ; then
     # This is the actual clustering command
-    cd-hit-est -i "$fasta" -o cluster_representatives -c $CLUSTERING -n "$WORDLENGTH" -d 0 -M 0 -T "$MULTITHREAD" -g "$CLUSTprog" > report_"${fasta%.*}.txt";
+    cd-hit-est -i "$fasta" -o cluster_representatives -c 0.95 -n 5 -d 0 -M 0 -T 1 -g 0 > report_"${fasta%.*}.txt";
     mv cluster_representatives cluster_representatives.fa
     # Read distribution will be summarized in report_***.txt within the folder.
     plot_len1.pl *.clstr \
@@ -95,10 +113,7 @@ echo "Clustering $folder..." ;
     make_multi_seq.pl *.fasta *.clstr multi-seq "$CLUSTERSIZE" ;
     fi
     done
-)
-fi
-done
-echo "Clustering complete." ;
+
 ```
 
 ## Align clustered Reads
