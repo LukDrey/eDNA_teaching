@@ -93,89 +93,76 @@ cd ..
  * to obtain groups of similar reads 
  * potentially the same species/OTU
  * CD-Hit
+ * combine all reads from one barcode in one big fasta to get accurate clusters
  
 ```{bash}
 # Enter the folder where we stored the .fasta files
 cd fasta_pass
 
+# Combine all fasta files into one big one per sample. 
+cat *.fasta > full_sequences.fa
+
 # Clustering reads to make a list of most abundant, representative reads
-    for fasta in *.fasta ; do
+    for fasta in *.fa ; do
     if [ -e "$fasta" ] ; then
     # This is the actual clustering command
-    cd-hit-est -i "$fasta" -o cluster_representatives -c 0.95 -n 5 -d 0 -M 0 -T 1 -g 0 > report_"${fasta%.*}.txt";
-    mv cluster_representatives cluster_representatives.fa
-    # Read distribution will be summarized in report_***.txt within the folder.
-    plot_len1.pl *.clstr \
-    1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999,1000-1999,2000-4999,5000-9999,10000-100000  \ >> size_report_"$fasta".txt ;
-    # Create files with clusters of a certain size
-    make_multi_seq.pl *.fasta *.clstr multi-seq "$CLUSTERSIZE" ;
+    cd-hit-est -i "$fasta" -o cluster_representatives${fasta%.*} -c 0.95 -n 8 -d 0 -M 0 -T 0 -g 1 > report_"${fasta%.*}.txt"; 
     fi
     done
+
+# Have a look at the cluster sizes
+for clstr in *.clstr ; do
+    if [ -e "$clstr" ] ; then
+    # Read distribution will be summarized in report_***.txt within the folder.
+    plot_len1.pl "$clstr" \
+    1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999 \
+    10-59,60-149,150-499,500-1999,2000-999999 \
+    >> size_report_"$clstr".txt ;
+    fi
+    done
+    
+    
+# Create files with clusters of a certain size
+ make_multi_seq.pl *.fa *.clstr multi-seq 2 
 
 ```
 
 ## Align clustered Reads
 
 ```{bash}
-# Allign with minimap2 and assemble with Racon
-for folder in */ ; do
-if [ -e "$folder"/multi-seq ] ; then
-(
-cd "$folder"/"multi-seq" || exit ;
+# Align with minimap2 and assemble with Racon
 
-    for file in * ;  do
-    if [ -e "${file}" ] ; then
-    #Rename extensionless fasta files: sequencecount-clustername.fa
-        if [ "${file}" == "*.*" ];
-        then
-        continue;
-        else
-        seq="$(cat "${file}" | grep ">" | wc -l)"
-        mv "${file}" "$seq-${file}.fa"
-        fi;
-    fi
-    done
-    # # -------------------------- # #
-    # # Subsampling large datasets # #
-        if ! [ "$CLUSTERmax" = "no" ] ; then
-        for file in *.fa ;  do
-        awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);} END {printf("\n");}' < "${file}" | awk 'NR>1{ printf("%s",$0); n++; if(n%2==0) { printf("\n");} else { printf("\t");} }' | awk -v k="$CLUSTERmax" 'BEGIN{srand(systime() + PROCINFO["pid"]);}{s=x++<k?x-1:int(rand()*x);if(s<k)R[s]=$0}END{for(i in R)print R[i]}' | awk -F"\t" '{print $1"\n"$2 > "'"subsampled_"$CLUSTERmax"-${file}"'"}'
-            for file in subsampled_*.fa ;  do
-            if [ -e "${file}" ] ; then
-            echo "Aligning and making draft assembly of $file...";
-            # Extract 1st fasta of each file as a reference point
-            tail -n 2 "${file}" > ref_"${file}"sta;
-            # Aligning all data in the cluster to the reference sequence
-            minimap2 -ax map-ont -k"$Kmer" ref_"${file}"sta "${file}" -t "$MULTITHREAD" > align_"${file}".sam ;
+# Navigate to the folder with our cluster sequences
+cd multi-seq
 
-            #Assemble the clustered sequences.
-            # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
-            racon -m 8 -x -6 -g -8 -w 500 -t "$MULTITHREAD" "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
-            fi
-            done
-        done
-        fi
-    # # ------------------------------- # #
+# Add .fa to all filenames...unless they are already .fa
+for file in *; do 
+case "$file" in *.fa) echo skipped $file;; *) mv "$file" "$file".fa; esac; done
 
-    if [ "$CLUSTERmax" = "no" ] ; then
-        for file in *.fa ;  do
+
+    for file in *.fa ;  do
         if [ -e "${file}" ] ; then
         echo "Aligning and making draft assembly of $file...";
-        # Extract 1st fasta of each file as a reference point
+        # Extract 1st sequence of each file as a reference point
         tail -n 2 "${file}" > ref_"${file}"sta;
         # Aligning all data in the cluster to the reference sequence
-        minimap2 -ax map-ont -k"$Kmer" ref_"${file}"sta "${file}" -t "$MULTITHREAD" > align_"${file}".sam ;
+        minimap2 -ax map-ont ref_"${file}"sta "${file}" -t 3 > align_"${file}".sam ;
 
         #Assemble the clustered sequences.
         # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
-        racon -m 8 -x -6 -g -8 -w 500 -t "$MULTITHREAD" "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
+        racon -m 8 -x -6 -g -8 -w 500 -t 3 "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
         fi
         done
-    fi
-    echo "Done";
-)
-fi
-done
+        
+        
+# Extract 1st sequence of each file as a reference point
+        tail -n 2 "${file}" > ref_"${file}"sta;
+        # Aligning all data in the cluster to the reference sequence
+        minimap2 -ax map-ont ref_"${file}"sta "${file}" -t 3 > align_"${file}".sam ;
+
+        #Assemble the clustered sequences.
+        # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
+        racon -m 8 -x -6 -g -8 -w 500 -t 3 "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta
 ```
 
 ## Polishing with Medaka
@@ -221,12 +208,6 @@ if [ $MEDAKA == "yes" ] ; then
 ## Blast search against UNITE database
 
 ```{bash}
-blastn -db ASVs_bacteria.fa \
--outfmt '6 qseqid sseqid pident' \
--out match_list_bacteria.txt \
--qcov_hsp_perc 80 \
--perc_identity 84 \
--num_threads 20 \
--query ASVs_bacteria.fa
+
 ```
 
