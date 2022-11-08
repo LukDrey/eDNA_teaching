@@ -102,11 +102,14 @@ cd fasta_pass
 # Combine all fasta files into one big one per sample. 
 cat *.fasta > full_sequences.fa
 
+# Activate Conda env
+conda activate master_class
+
 # Clustering reads to make a list of most abundant, representative reads
     for fasta in *.fa ; do
     if [ -e "$fasta" ] ; then
     # This is the actual clustering command
-    cd-hit-est -i "$fasta" -o cluster_representatives${fasta%.*} -c 0.95 -n 8 -d 0 -M 0 -T 0 -g 1 > report_"${fasta%.*}.txt"; 
+    cd-hit-est -i "$fasta" -o cluster_representatives${fasta%.*} -c 0.8 -n 5 -d 0 -M 0 -T 0 -g 1 > report_"${fasta%.*}.txt"; 
     fi
     done
 
@@ -115,7 +118,7 @@ for clstr in *.clstr ; do
     if [ -e "$clstr" ] ; then
     # Read distribution will be summarized in report_***.txt within the folder.
     plot_len1.pl "$clstr" \
-    1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999 \
+    1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999,1000-10000 \
     10-59,60-149,150-499,500-1999,2000-999999 \
     >> size_report_"$clstr".txt ;
     fi
@@ -130,8 +133,6 @@ for clstr in *.clstr ; do
 ## Align clustered Reads
 
 ```{bash}
-# Align with minimap2 and assemble with Racon
-
 # Navigate to the folder with our cluster sequences
 cd multi-seq
 
@@ -139,7 +140,7 @@ cd multi-seq
 for file in *; do 
 case "$file" in *.fa) echo skipped $file;; *) mv "$file" "$file".fa; esac; done
 
-
+# Align the reads of each cluster to the first sequence of that cluster that is the so-called  "parent"/"reference" sequence
     for file in *.fa ;  do
         if [ -e "${file}" ] ; then
         echo "Aligning and making draft assembly of $file...";
@@ -148,49 +149,30 @@ case "$file" in *.fa) echo skipped $file;; *) mv "$file" "$file".fa; esac; done
         # Aligning all data in the cluster to the reference sequence
         minimap2 -ax map-ont ref_"${file}"sta "${file}" -t 3 > align_"${file}".sam ;
 
-        #Assemble the clustered sequences.
+        # Assemble the clustered sequences.
         # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
         racon -m 8 -x -6 -g -8 -w 500 -t 3 "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
         fi
         done
-        
-        
-# Extract 1st sequence of each file as a reference point
-        tail -n 2 "${file}" > ref_"${file}"sta;
-        # Aligning all data in the cluster to the reference sequence
-        minimap2 -ax map-ont ref_"${file}"sta "${file}" -t 3 > align_"${file}".sam ;
-
-        #Assemble the clustered sequences.
-        # Racon settings optimized for Medaka: -m 8 -x -6 -g -8 -w 500
-        racon -m 8 -x -6 -g -8 -w 500 -t 3 "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta
 ```
 
 ## Polishing with Medaka
 
 ```{bash}
-if [ $MEDAKA == "yes" ] ; then
-    #Polish the Racon secuence with Medaka
-    for folder in */ ; do
-    if [ -e "$folder"/multi-seq ] ; then
-    (
-    cd "$folder"/"multi-seq" || exit ;
+# Because Medaka does not run nicely in the previous conda environment we will need to move to another
+conda deactivate master_class 
+
+conda activate decona 
+
         for fa in *.fa ;  do
         if [ -e "polished_${fa}sta" ] ; then
         echo "polishing ${fa} Racon sequence with Medaka..."
-        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o "consensus_medaka_${fa}" -t "$MULTITHREAD" ;
+        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o "consensus_medaka_${fa}" -t 10 ;
         fi
         done
-    echo "Done polishing ${fa}";
-    )
-    fi
-    done
 
     #Change names of Medaka consensus to have their cluster's name
     #move them one folder up
-    for folder in */ ; do
-    if [ -e "${folder}"/multi-seq ] ; then
-    (
-    cd "${folder}"/"multi-seq" || exit ;
     for folders in consensus_medaka_*; do
     if [ -e "${folders}" ] ; then
     (
@@ -200,14 +182,22 @@ if [ $MEDAKA == "yes" ] ; then
     )
     fi
     done
-    )
-    fi
-    done
 ```
 
 ## Blast search against UNITE database
 
 ```{bash}
+# Make a searchable BLAST database out of the UNITE general .fasta release. 
+makeblastdb -in sh_general_release_dynamic_27.10.2022.fasta -title unite_db -parse_seqids -dbtype nucl
 
+# Match the consensus sequences to the UNITE database 
+blastn -query consensus.fasta \
+-strand both \
+-task megablast \
+-db unite_db \
+-out fungal_taxonomy.txt \
+-outfmt 6 \
+-num_threads 80 \
+-max_target_seqs 1
 ```
 
