@@ -54,7 +54,30 @@ scontrol show job $SLURM_JOB_ID
 
 - barcode removal is on by default if using the demultiplexing flag (--barcode_kits)
 
-# Turn Fastq to Fasta
+# cd Filter data on size and quality with NanoFilt
+```{bash}
+
+# Count raw sequences
+    (cat *.fastq | grep "runid" | wc -l)
+    mkdir temporary_filtered
+    echo "Filtering data..."
+    cat *.fastq | NanoFilt -q 10 -l 500 --maxlength 2000 > temporary_filtered/Q_filt.fastq
+    echo "Data filtered with NanoFilt"
+
+
+    for folder in ./temporary_filtered ; do
+    if [ -e "$folder" ] ; then
+    filtered_seq="$(cat "$folder"/*_filt.fastq | grep "runid" | wc -l)"
+    echo "total raw sequences = $raw_seq"
+    echo "total filtered sequences = $filtered_seq"
+        (
+
+        cd "$folder" || exit ;
+            mv *.fastq ..
+        )
+    fi
+    done
+```
 
 ### We want to create a folder where we can store the FASTA files and need to unzip the FASTQ files. 
 
@@ -167,7 +190,7 @@ conda activate decona
         for fa in *.fa ;  do
         if [ -e "polished_${fa}sta" ] ; then
         echo "polishing ${fa} Racon sequence with Medaka..."
-        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o "consensus_medaka_${fa}" -t 10 ;
+        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o ../"consensus_medaka_${fa}" -t 10 ;
         fi
         done
 
