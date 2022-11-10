@@ -54,61 +54,43 @@ scontrol show job $SLURM_JOB_ID
 
 - barcode removal is on by default if using the demultiplexing flag (--barcode_kits)
 
-# cd Filter data on size and quality with NanoFilt
-```{bash}
-
-# Count raw sequences
-    (cat *.fastq | grep "runid" | wc -l)
-    mkdir temporary_filtered
-    echo "Filtering data..."
-    cat *.fastq | NanoFilt -q 10 -l 500 --maxlength 2000 > temporary_filtered/Q_filt.fastq
-    echo "Data filtered with NanoFilt"
-
-
-    for folder in ./temporary_filtered ; do
-    if [ -e "$folder" ] ; then
-    filtered_seq="$(cat "$folder"/*_filt.fastq | grep "runid" | wc -l)"
-    echo "total raw sequences = $raw_seq"
-    echo "total filtered sequences = $filtered_seq"
-        (
-
-        cd "$folder" || exit ;
-            mv *.fastq ..
-        )
-    fi
-    done
-```
-
-### We want to create a folder where we can store the FASTA files and need to unzip the FASTQ files. 
+### Quality and trimming with Nanofilt  
 
 ```{bash}
-mkdir ./fasta_pass
-
+# Move into the directory where the fastq files that passed the initial quality control are stored 
 cd fastq_pass 
 
-gzip -d fastq_pass/*.gz
+# Unzip the files 
+gzip *.gz
 
-cd .. 
+# Make one big fastq file for processing 
+cat *.fastq > ../full_sequences.fastq
+
+# Make a big fastq file and filter it based on Quality score, minimum and maximum length
+cat *.fastq | NanoFilt -q 10 -l 500 --maxlength 2000 > ../full_sequences_filtered.fastq
+
+cd ..
 ```
 
 
  * later we need the reads in fasta format so we need to convert 
 ```{bash}
-# enter the folder where the .fastq files are stored.
-cd fastq_pass
+# Make a directory to store the fasta files in 
+mkdir fasta_pass
 
-# Turn all .fastq files inside the folder into .fasta files
+# Turn the two .fastq files of the full and filtered sequences into .fasta files
 for i in *.fastq ;  do
             if [ -e "$i" ] ; then
             cat "$i" | grep -A 1 'runid' | sed '/^--$/d' | sed 's/^@/>/' | awk '{print $1}' > "${i%%.*}.fasta" ; 
             fi
             done
+            
+# Compare how many sequences we filtered out
+grep -c '^>' *.fasta | less
 
 # Move the .fasta files to the folder we created before.
-mv ./*.fasta ../fasta_pass
+mv ./*.fasta ./fasta_pass
 
-# Exit the fastq_pass folder 
-cd .. 
 ```
 
 ## Clustering the Reads
@@ -122,17 +104,17 @@ cd ..
 # Enter the folder where we stored the .fasta files
 cd fasta_pass
 
-# Combine all fasta files into one big one per sample. 
-cat *.fasta > full_sequences.fa
-
-# Activate Conda env
+# Activate Conda environment where all the programms are installed 
 conda activate master_class
+
+# Sub sample sequences so we can run all commands locally 
+seqtk sample -s100 full_sequences_filtered.fasta 10000 > subset_sequences.fa
 
 # Clustering reads to make a list of most abundant, representative reads
     for fasta in *.fa ; do
     if [ -e "$fasta" ] ; then
     # This is the actual clustering command
-    cd-hit-est -i "$fasta" -o cluster_representatives${fasta%.*} -c 0.8 -n 5 -d 0 -M 0 -T 0 -g 1 > report_"${fasta%.*}.txt"; 
+    cd-hit-est -i "$fasta" -o cluster_representatives_${fasta%.*} -c 0.8 -n 5 -d 0 -M 0 -T 0 -g 1 > report_"${fasta%.*}.txt"; 
     fi
     done
 
@@ -142,14 +124,13 @@ for clstr in *.clstr ; do
     # Read distribution will be summarized in report_***.txt within the folder.
     plot_len1.pl "$clstr" \
     1,2-4,5-9,10-19,20-49,50-99,100-299,300-499,500-999,1000-10000 \
-    10-59,60-149,150-499,500-1999,2000-999999 \
     >> size_report_"$clstr".txt ;
     fi
     done
     
     
 # Create files with clusters of a certain size
- make_multi_seq.pl *.fa *.clstr multi-seq 2 
+ make_multi_seq.pl *.fa *.clstr multi-seq 10 
 
 ```
 
@@ -159,7 +140,7 @@ for clstr in *.clstr ; do
 # Navigate to the folder with our cluster sequences
 cd multi-seq
 
-# Add .fa to all filenames...unless they are already .fa
+# Add .fa to all filenames, unless they are already .fa (so we do not get into an infinite loop)
 for file in *; do 
 case "$file" in *.fa) echo skipped $file;; *) mv "$file" "$file".fa; esac; done
 
@@ -177,13 +158,20 @@ case "$file" in *.fa) echo skipped $file;; *) mv "$file" "$file".fa; esac; done
         racon -m 8 -x -6 -g -8 -w 500 -t 3 "${file}" align_"${file}".sam ref_"${file}"sta > polished_"${file}"sta ;
         fi
         done
+        
+cd .. 
+
+mkdir polished_seqs 
+
+mv ./multi-seq/*polished* ./polished_seqs
+mv ./multi-seq/*.fa ./polished_seqs
 ```
 
 ## Polishing with Medaka
 
 ```{bash}
 # Because Medaka does not run nicely in the previous conda environment we will need to move to another
-conda deactivate master_class 
+cd polished_seqs
 
 conda activate decona 
 
@@ -220,7 +208,8 @@ blastn -query consensus.fasta \
 -db unite_db \
 -out fungal_taxonomy.txt \
 -outfmt 6 \
--num_threads 80 \
--max_target_seqs 1
+-num_threads 3 \
+-max_target_seqs 1 \
+-perc_identity 0.9
 ```
 
