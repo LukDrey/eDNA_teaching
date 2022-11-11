@@ -9,11 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r klippy, echo=FALSE, include=TRUE}
-library(klippy)
-klippy::klippy()
-```
-
 ## Program List 
 
  * guppy (will run internally?)
@@ -178,7 +173,7 @@ conda activate decona
         for fa in *.fa ;  do
         if [ -e "polished_${fa}sta" ] ; then
         echo "polishing ${fa} Racon sequence with Medaka..."
-        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o ../"consensus_medaka_${fa}" -t 10 ;
+        medaka_consensus -i "${fa}" -d "polished_${fa}sta" -o ./"consensus_medaka_${fa}" -t 10 ;
         fi
         done
 
@@ -189,7 +184,7 @@ conda activate decona
     (
         cd "${folders}" || exit ;
         [ ! -f consensus.fasta ] || mv consensus.fasta "${folders}sta"
-        [ ! -f "${folders}sta" ] || mv "${folders}sta" ..
+        [ ! -f "${folders}sta" ] || mv "${folders}sta" ../final_seqs
     )
     fi
     done
@@ -198,14 +193,17 @@ conda activate decona
 ## Blast search against UNITE database
 
 ```{bash}
+# Combine he consensus sequences into one big fasta file
+cat *.fasta > full_consensus.fasta
+
 # Make a searchable BLAST database out of the UNITE general .fasta release. 
-makeblastdb -in sh_general_release_dynamic_27.10.2022.fasta -title unite_db -parse_seqids -dbtype nucl
+makeblastdb -in test.fasta -title "unite_db" -parse_seqids -dbtype nucl -out unite_db
 
 # Match the consensus sequences to the UNITE database 
-blastn -query consensus.fasta \
+blastn -query full_consensus.fasta \
 -strand both \
 -task megablast \
--db unite_db \
+-db /phylodata/ldreyling/BigCampaign/full_data/NCBI_DB/"nt" \
 -out fungal_taxonomy.txt \
 -outfmt 6 \
 -num_threads 3 \
