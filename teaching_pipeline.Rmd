@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Program List 
 
- * guppy (will run internally?)
+ * guppy (run during sequencing)
     + already demultiplexes and filters low quality reads
  * Decona pipeline
     + CD-Hit &rarr; clustering Reads 
@@ -20,7 +20,6 @@ knitr::opts_chunk$set(echo = TRUE)
     + Medaka &rarr; plosih the sequences
  * Blast+
  * R (and RStudio)
-    + packages: vegan, microbiome, ggplot, here 
     
 ## Basecalling and Demultiplexing 
 
@@ -51,7 +50,7 @@ scontrol show job $SLURM_JOB_ID
 
 ### Quality and trimming with Nanofilt  
 
-```{bash}
+```{bash, eval = F}
 # Move into the directory where the fastq files that passed the initial quality control are stored 
 cd fastq_pass 
 
@@ -69,7 +68,7 @@ cd ..
 
 
  * later we need the reads in fasta format so we need to convert 
-```{bash}
+```{bash, eval = F}
 # Make a directory to store the fasta files in 
 mkdir fasta_pass
 
@@ -95,7 +94,7 @@ mv ./*.fasta ./fasta_pass
  * CD-Hit
  * combine all reads from one barcode in one big fasta to get accurate clusters
  
-```{bash}
+```{bash, eval = F}
 # Enter the folder where we stored the .fasta files
 cd fasta_pass
 
@@ -131,7 +130,7 @@ for clstr in *.clstr ; do
 
 ## Align clustered Reads
 
-```{bash}
+```{bash, eval = F}
 # Navigate to the folder with our cluster sequences
 cd multi-seq
 
@@ -164,7 +163,7 @@ mv ./multi-seq/*.fa ./polished_seqs
 
 ## Polishing with Medaka
 
-```{bash}
+```{bash, eval = F}
 # Because Medaka does not run nicely in the previous conda environment we will need to move to another
 cd polished_seqs
 
@@ -184,30 +183,61 @@ conda activate decona
     (
         cd "${folders}" || exit ;
         [ ! -f consensus.fasta ] || mv consensus.fasta "${folders}sta"
-        [ ! -f "${folders}sta" ] || mv "${folders}sta" ../final_seqs
+        [ ! -f "${folders}sta" ] || mv "${folders}sta" ../../final_seqs
     )
     fi
     done
+
+cd .. 
+
+# Make one big fasta file for processing 
+cat *.fasta > ./full_consensus.fasta
 ```
 
-## Blast search against UNITE database
+## Move to R and taxonomy assignment 
 
-```{bash}
-# Combine he consensus sequences into one big fasta file
-cat *.fasta > full_consensus.fasta
+```{R, eval = F}
+library(dada2)
 
-# Make a searchable BLAST database out of the UNITE general .fasta release. 
-makeblastdb -in test.fasta -title "unite_db" -parse_seqids -dbtype nucl -out unite_db
+unite.ref <- '/home/Evo9-Schmitt/Documents/Data/sh_general_release_dynamic_27.10.2022.fasta'
+sequences <- '/home/Evo9-Schmitt/Documents/Data/full_consensus'
 
-# Match the consensus sequences to the UNITE database 
-blastn -query full_consensus.fasta \
--strand both \
--task megablast \
--db /phylodata/ldreyling/BigCampaign/full_data/NCBI_DB/"nt" \
--out fungal_taxonomy.txt \
--outfmt 6 \
--num_threads 3 \
--max_target_seqs 1 \
--perc_identity 0.9
+fungi_taxa <- dada2::assignTaxonomy(sequences, unite.ref, multithread = TRUE, tryRC = TRUE, minBoot = 80)
+
+tax_fungi <- base::as.data.frame(fungi_taxa) %>%
+  tibble::rownames_to_column('sequence')
+tax_fungi <- tax_fungi %>%
+  dplyr::rename(sequence_fungi = sequence)
+
+# Load the fungal reads.
+fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus.fasta')
+
+# Make a dataframe of the sequences and their ASV ID. 
+seq_name_fungi <- base::names(fungi_seqs_fasta)
+sequence_fungi <- base::paste(fungi_seqs_fasta)
+fungi_rep_seqs <- base::data.frame(seq_name_fungi, sequence_fungi)
+
+# Join the taxonomy table and the representative sequences
+tax_clean_fungi <- dplyr::left_join(tax_fungi, fungi_rep_seqs, by = 'sequence_fungi')
+
+# Split the taxonomy into different columns of taxonomic levels.
+
+fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , sep = '__')
+fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Phylum, c(NA, 'Phylum') , sep = '__')
+fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Class, c(NA, 'Class') , sep = '__')
+fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Order, c(NA, 'Order') , sep = '__')
+fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Family, c(NA, 'Family') , sep = '__')
+fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Genus, c(NA, 'Genus') , sep = '__')
+fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Species, c(NA, 'Species') , sep = '__')
+
+# Rename the ASV_ID column. 
+fungi_tax_fin <- dplyr::rename(fungi_tax_fin, ASV_ID = seq_name_fungi)
+
+# Set rownames.
+base::row.names(fungi_tax_fin) <- fungi_tax_fin$ASV_ID
+
+fungi_tax_fin$sequence_fungi <- NULL
+fungi_tax_fin$ASV_ID <- NULL
+
 ```
 
