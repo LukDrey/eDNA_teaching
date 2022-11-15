@@ -192,24 +192,35 @@ cd ..
 
 # Make one big fasta file for processing 
 cat *.fasta > ./full_consensus.fasta
+
+# Change the names of the Sequences to more manageable names. 
+sed 's/^>.*$/>asv/' full_consensus.fasta | perl -pe 's/asv/$i++/ge' | sed 's/^>/>asv/' > full_consensus.fasta
 ```
 
 ## Move to R and taxonomy assignment 
 
+ * dada2 naive bayesian classifier 
+ * matching taxonomy against the UNITE database &rarr; special curated database of fungal ITS sequences
 ```{R, eval = F}
+# Load the packages we need for the analysis. 
 library(dada2)
+library(tidyverse)
+library(Biostrings)
 
-unite.ref <- '/home/Evo9-Schmitt/Documents/Data/sh_general_release_dynamic_27.10.2022.fasta'
-sequences <- '/home/Evo9-Schmitt/Documents/Data/full_consensus'
+# Set the paths to where the files are stored. 
+unite.ref <- '/home/evo9-schmitt/Documents/Data/sh_general_release_dynamic_27.10.2022.fasta'
+sequences <- '/home/evo9-schmitt/Documents/Data/full_consensus_rename.fasta'
 
+# Taxonomy assignment with dada2 (https://benjjneb.github.io/dada2/index.html). 
 fungi_taxa <- dada2::assignTaxonomy(sequences, unite.ref, multithread = TRUE, tryRC = TRUE, minBoot = 80)
 
+# Convert the dada2 output to a dataframe 
 tax_fungi <- base::as.data.frame(fungi_taxa) %>%
   tibble::rownames_to_column('sequence')
 tax_fungi <- tax_fungi %>%
   dplyr::rename(sequence_fungi = sequence)
 
-# Load the fungal reads.
+# Load the fungal reads from the fasta file with the consensus sequences. 
 fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus.fasta')
 
 # Make a dataframe of the sequences and their ASV ID. 
@@ -217,18 +228,17 @@ seq_name_fungi <- base::names(fungi_seqs_fasta)
 sequence_fungi <- base::paste(fungi_seqs_fasta)
 fungi_rep_seqs <- base::data.frame(seq_name_fungi, sequence_fungi)
 
-# Join the taxonomy table and the representative sequences
+# Join the taxonomy table and the representative sequences.
 tax_clean_fungi <- dplyr::left_join(tax_fungi, fungi_rep_seqs, by = 'sequence_fungi')
 
 # Split the taxonomy into different columns of taxonomic levels.
-
-fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , sep = '__')
-fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Phylum, c(NA, 'Phylum') , sep = '__')
-fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Class, c(NA, 'Class') , sep = '__')
-fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Order, c(NA, 'Order') , sep = '__')
-fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Family, c(NA, 'Family') , sep = '__')
-fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Genus, c(NA, 'Genus') , sep = '__')
-fungi_tax_fin <- tidyr::separate(fungi_tax_fin, Species, c(NA, 'Species') , sep = '__')
+fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , sep = '__') %>%
+  tidyr::separate(fungi_tax_fin, Phylum, c(NA, 'Phylum') , sep = '__') %>% 
+  tidyr::separate(fungi_tax_fin, Class, c(NA, 'Class') , sep = '__') %>% 
+  tidyr::separate(fungi_tax_fin, Order, c(NA, 'Order') , sep = '__') %>% 
+  tidyr::separate(fungi_tax_fin, Family, c(NA, 'Family') , sep = '__') %>% 
+  tidyr::separate(fungi_tax_fin, Genus, c(NA, 'Genus') , sep = '__') %>% 
+  tidyr::separate(fungi_tax_fin, Species, c(NA, 'Species') , sep = '__')
 
 # Rename the ASV_ID column. 
 fungi_tax_fin <- dplyr::rename(fungi_tax_fin, ASV_ID = seq_name_fungi)
@@ -236,8 +246,7 @@ fungi_tax_fin <- dplyr::rename(fungi_tax_fin, ASV_ID = seq_name_fungi)
 # Set rownames.
 base::row.names(fungi_tax_fin) <- fungi_tax_fin$ASV_ID
 
+# Remove the sequences and ASV IDs 
 fungi_tax_fin$sequence_fungi <- NULL
 fungi_tax_fin$ASV_ID <- NULL
-
 ```
-
