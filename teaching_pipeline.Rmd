@@ -28,7 +28,7 @@ Below you can see the full list of programs/tools/packages that comprise both th
  * [R[(https://www.r-project.org/)] (and [RStudio](https://posit.co/products/open-source/rstudio/)): statistical software environment
     + [DADA2](https://benjjneb.github.io/dada2/): R package for assigning taxonomy
     
-Another important component of our program list is [conda](https://docs.conda.io/en/latest/), which is a package, dependency, and environment management tool for Unix systems (although it can be used on Windows, too). The two main advantages of conda is 1) to allow you to both easily install new programs and tools, and 2) to keep your tools separated into "environments" that can avoid dependency-related problems between different versions of certain packages. This second advantage is something we will see in step 5 of our analysis. 
+Another important component of our program list is [conda](https://docs.conda.io/en/latest/), which is a package, dependency, and environment management tool for Unix systems (although it can be used on Windows, too). The two main advantages of conda is 1) to allow you to easily install new programs and tools, and 2) to keep your tools separated into "environments" that can avoid dependency-related problems between different versions of certain packages. This second advantage is something we will see in step 5 of our analysis. 
 
 If you want to know more about what this means and how to create and use different environments on conda, [you can go here](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-environments).
     
@@ -74,19 +74,33 @@ At this point we have our sequences in a [FASTQ](https://en.wikipedia.org/wiki/F
 
 There are many available tools for processing FASTQ files, but here we make use of NanoFilt, which is tailor-made for long read sequencing data approaches such as ONT.
 
+First, we move into the directory where the fastq files that passed the initial quality control are stored:
+
 ```{bash, eval = F}
-# Move into the directory where the fastq files that passed the initial quality control are stored 
 cd fastq_pass 
+```
 
-# Unzip the files 
+Unzip the files:
+
+```{bash, eval = F}
 gzip *.gz
+```
 
-# Make one big fastq file for processing 
+Make one big fastq file for processing by pasting the sequences together:
+
+```{bash, eval = F}
 cat *.fastq > ../full_sequences.fastq
+```
 
-# Make a big fastq file and filter it based on Quality score, minimum and maximum length
+Then we make a big FASTQ file and filter it based on the quality score, as well as the minimum and maximum length of the reads:
+
+```{bash, eval = F}
 cat *.fastq | NanoFilt -q 10 -l 500 --maxlength 2000 > ../full_sequences_filtered.fastq
+```
 
+Finally, move back up one level:
+
+```{bash, eval = F}
 cd ..
 ```
 
@@ -183,7 +197,9 @@ Navigate to the folder with our cluster sequences and add .fa to all filenames, 
 
 ```{bash, eval = F}
 cd multi-seq
+```
 
+```{bash, eval = F}
 for file in *; do 
   case "$file" in *.fa) echo skipped $file;; *) mv "$file" "$file".fa; esac; done
 ```
@@ -212,8 +228,17 @@ Now we can make a new directory and place our newly polished (consensus) sequenc
 
 ```{bash, eval = F}
 cd .. 
-mkdir polished_seqs 
+```
+
+```{bash, eval = F}
+mkdir polished_seqs
+```
+
+```{bash, eval = F}
 mv ./multi-seq/*polished* ./polished_seqs
+```
+
+```{bash, eval = F}
 mv ./multi-seq/*.fa ./polished_seqs
 ```
 
@@ -226,6 +251,9 @@ Because Medaka does not play nicely with some of the package versions in our cur
 
 ```{bash, eval = F}
 cd polished_seqs
+```
+
+```{bash, eval = F}
 conda activate decona 
 ```
 
@@ -258,6 +286,9 @@ Then we make one big FASTA file for further analysis:
 
 ```{bash, eval = F}
 cd .. 
+```
+
+```{bash, eval = F}
 cat *.fasta > ./full_consensus.fasta
 ```
 
