@@ -5,10 +5,6 @@ date: "2022-09-27"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 # 2022 Master's metabarcoding of soil samples from Frankfurt-Riedberg
 
 The purpose of this pipeline is to process Oxford NanoPore (ONT) metabarcoding data of soil samples taken from the Wissenschaftsgarten at the University of Frankfurt (Riedberg Campus). To that end, we will utilize a variety of command line tools that are built for use in a Unix (i.e. Linux or macOS) environment. Most of these tools are used as part of the [Decona pipeline](https://github.com/Saskia-Oosterbroek/decona), but are independent tools/programs in their own right that have applications outside of this pipeline. 
