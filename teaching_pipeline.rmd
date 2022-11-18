@@ -311,7 +311,7 @@ unite.ref <- '/home/evo9-schmitt/Documents/Data/sh_general_release_dynamic_27.10
 sequences <- '/home/evo9-schmitt/Documents/Data/full_consensus_rename.fasta'
 
 # Taxonomy assignment with dada2 (https://benjjneb.github.io/dada2/index.html). 
-fungi_taxa <- dada2::assignTaxonomy(sequences, unite.ref, multithread = TRUE, tryRC = TRUE, minBoot = 80)
+fungi_taxa <- dada2::assignTaxonomy(sequences, unite.ref, multithread = TRUE, tryRC = TRUE)
 
 # Convert the dada2 output to a dataframe 
 tax_fungi <- base::as.data.frame(fungi_taxa) %>%
@@ -349,3 +349,48 @@ base::row.names(fungi_tax_fin) <- fungi_tax_fin$ASV_ID
 fungi_tax_fin$sequence_fungi <- NULL
 fungi_tax_fin$ASV_ID <- NULL
 ```
+
+## 7. Compare the taxonomy obtained from the metabarcoding to the floristic study 
+
+```{r, eval = F}
+# Read in the table from the floristic study. 
+floristic <- utils::read.csv('WiGa_Pilze_Master_20220525_MMM.csv', sep = ',')
+
+# Keep only the columns of the dataframe we want to keep and change their names to english. 
+floristic_clean <- dplyr::select(floristic, Abteilung, Ordnung, Familie, Gattung, Epitheton,
+                                 Ökologie, colonized.organ) %>% 
+  dplyr::rename(Phylum = Abteilung,
+                Order = Ordnung,
+                Family = Familie,
+                Genus = Gattung, 
+                Species = Epitheton,
+                Ecology = Ökologie,
+                substrate = colonized.organ)
+
+# Subset the dataframe to records coming from soil and change the cell values to soil.  
+floristic_soil <-  dplyr::filter(floristic_clean, substrate == "Erde") %>% 
+  mutate(substrate = replace(substrate, substrate == "Erde", "soil"))
+
+# Find overlaps in genera.
+overlap <- dplyr::intersect(floristic_soil$Genus, fungi_tax_fin$Genus)
+```
+
+## 8. Metabarcoding reads vs Sanger reads
+
+ * move to the terminal
+ 
+```{bash, eval = F}
+# Create a database containing the metabarcoding consensus sequences.
+makeblastdb -in file -parse_seqids -dbtype nucl -out blastdb
+
+# Compare the sequences to each other and create a match list of sequences that are similar to each other.
+blastn -db blast_db \
+-outfmt '6 qseqid sseqid pident' \
+-out sanger_meta_comp.txt \
+-qcov_hsp_perc 80 \
+-perc_identity 84 \
+-num_threads 6 \
+-query full_consensus.fasta
+```
+
+
