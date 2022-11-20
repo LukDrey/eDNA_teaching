@@ -227,6 +227,8 @@ cd ..
 
 ```{bash, eval = F}
 mkdir polished_seqs
+
+mkdir final_seqs
 ```
 
 ```{bash, eval = F}
@@ -271,7 +273,7 @@ for folders in consensus_medaka_*; do
     (
         cd "${folders}" || exit ;
         [ ! -f consensus.fasta ] || mv consensus.fasta "${folders}sta"
-        [ ! -f "${folders}sta" ] || cp "${folders}sta" ../final_seqs
+        [ ! -f "${folders}sta" ] || cp "${folders}sta" ../../final_seqs
     )
     fi
     done
@@ -281,6 +283,8 @@ Then we make one big FASTA file for further analysis:
 
 ```{bash, eval = F}
 cd .. 
+
+cd final_seqs
 ```
 
 ```{bash, eval = F}
@@ -290,7 +294,7 @@ cat *.fasta > ./full_consensus.fasta
 Finally, we do some housekeeping and pare down the names of the sequences to a more manageable length: 
 
 ```{bash, eval = F}
-sed 's/^>.*$/>asv/' full_consensus.fasta | perl -pe 's/asv/$i++/ge' | sed 's/^>/>asv/' > full_consensus.fasta
+sed 's/^>.*$/>asv/' full_consensus.fasta | perl -pe 's/asv/$i++/ge' | sed 's/^>/>asv/' > full_consensus_rename.fasta
 ```
 
 ## 6. Moving on to R and performing the taxonomy assignment 
