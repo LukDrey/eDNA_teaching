@@ -295,41 +295,70 @@ sed 's/^>.*$/>asv/' full_consensus.fasta | perl -pe 's/asv/$i++/ge' | sed 's/^>/
 
 ## 6. Moving on to R and performing the taxonomy assignment 
 
- * dada2 naive bayesian classifier 
- * matching taxonomy against the UNITE database &rarr; special curated database of fungal ITS sequences
- 
+Now that we have our polished consensus sequences, we can proceed to taxonomic assignment. In theory, the simplest way to perform taxonomic assingment would be to BLAST all of our consensus sequences against a database (such as the [UNITE database](https://unite.ut.ee/)  of fungal ITS sequences). For a large-scale dataset where we have hundreds, potentially thousands of ASVs/OTUs to assign, however, we want to automate this process somewhat. 
+
+DADA2 is an R package that allows us to assign taxonomy across multiple ranks (e.g. kingdom on down to species-level) to marker-gene data, such as the ITS region for fungi. DADA2 automates this process using a naive Bayesian classifier method; if you don't know what Bayesian statistics are or how they differ from classical (i.e. "frequentist") statistics, a simple (if not entirely accurate) way to think about it is that Bayesian statistics incorporates prior knowledge into your statistical assumptions. [You can read a lot more about this concept here](https://towardsdatascience.com/bayesian-statistics-101-4c4bc5fde1e1) or elsewhere on the internet. For our purposes here, knowing information about certain taxonomic ranks (like the genus) limits or constrains the other taxonomic information for that sample (like the order or class), and DADA2 therefore takes this information into account.
+
+As mentioned, DADA2 is an R package, which means we must first activate R before typing in any of our code. You can do this quite simply by typing "R" into the terminal:
+
+```{bash, eval = F}
+R
+```
+
+R uses packages like DADA2 to provide a lot of its functionality. In this case, the 3 packages we will use are already installed, so you can load these immediately:
 
 ```{R, eval = F}
 # Load the packages we need for the analysis. 
 library(dada2)
 library(tidyverse)
 library(Biostrings)
+```
 
-# Set the paths to where the files are stored. 
+Next, we set the paths to where the files are stored:
+
+```{R, eval = F}
 unite.ref <- '/home/evo9-schmitt/Documents/Data/sh_general_release_dynamic_27.10.2022.fasta'
 sequences <- '/home/evo9-schmitt/Documents/Data/full_consensus_rename.fasta'
+```
 
-# Taxonomy assignment with dada2 (https://benjjneb.github.io/dada2/index.html). 
+Here we perform the actual taxonomic assignment using DADA2's assignTaxonomy method:
+
+```{R, eval = F}
 fungi_taxa <- dada2::assignTaxonomy(sequences, unite.ref, multithread = TRUE, tryRC = TRUE)
+```
 
-# Convert the dada2 output to a dataframe 
+Then convert the DADA2 output to a dataframe:
+
+```{R, eval = F}
 tax_fungi <- base::as.data.frame(fungi_taxa) %>%
   tibble::rownames_to_column('sequence')
 tax_fungi <- tax_fungi %>%
   dplyr::rename(sequence_fungi = sequence)
+```
 
-# Load the fungal reads from the fasta file with the consensus sequences. 
+Load the fungal reads from the fasta file with the consensus sequences:
+
+```{R, eval = F}
 fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus.fasta')
+```
 
-# Make a dataframe of the sequences and their ASV ID. 
+Make a dataframe of the sequences and their ASV ID:
+
+```{R, eval = F}
 seq_name_fungi <- base::names(fungi_seqs_fasta)
 sequence_fungi <- base::paste(fungi_seqs_fasta)
 fungi_rep_seqs <- base::data.frame(seq_name_fungi, sequence_fungi)
+```
 
-# Join the taxonomy table and the representative sequences.
+Join the taxonomy table and the representative sequences:
+
+```{R, eval = F}
 tax_clean_fungi <- dplyr::left_join(tax_fungi, fungi_rep_seqs, by = 'sequence_fungi')
+```
 
-# Split the taxonomy into different columns of taxonomic levels.
+Split the taxonomy into different columns of taxonomic levels:
+
+```{R, eval = F}
 fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , sep = '__') %>%
   tidyr::separate(fungi_tax_fin, Phylum, c(NA, 'Phylum') , sep = '__') %>% 
   tidyr::separate(fungi_tax_fin, Class, c(NA, 'Class') , sep = '__') %>% 
@@ -337,25 +366,40 @@ fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , se
   tidyr::separate(fungi_tax_fin, Family, c(NA, 'Family') , sep = '__') %>% 
   tidyr::separate(fungi_tax_fin, Genus, c(NA, 'Genus') , sep = '__') %>% 
   tidyr::separate(fungi_tax_fin, Species, c(NA, 'Species') , sep = '__')
+```
 
-# Rename the ASV_ID column. 
+Rename the ASV_ID column:
+
+```{R, eval = F}
 fungi_tax_fin <- dplyr::rename(fungi_tax_fin, ASV_ID = seq_name_fungi)
+```
 
-# Set rownames.
+Set rownames:
+
+```{R, eval = F}
 base::row.names(fungi_tax_fin) <- fungi_tax_fin$ASV_ID
+```
 
-# Remove the sequences and ASV IDs 
+Finally, remove the sequences and ASV IDs: 
+
+```{R, eval = F}
 fungi_tax_fin$sequence_fungi <- NULL
 fungi_tax_fin$ASV_ID <- NULL
 ```
 
+We should now have a table with just the taxonomic assignments for each of our ASVs, with their original sequence IDs, in case we want to go back to those sequences later. We can now proceed to compare the results of our metabarcoding approach to the floristic table that has been obtained over several years of manual observation in the plots, and do our own "human vs machine" analysis.
+
 ## 7. Compare the taxonomy obtained from the metabarcoding to the floristic study 
 
-```{r, eval = F}
-# Read in the table from the floristic study. 
-floristic <- utils::read.csv('WiGa_Pilze_Master_20220525_MMM.csv', sep = ',')
+First we read in the floristic table:
 
-# Keep only the columns of the dataframe we want to keep and change their names to english. 
+```{r, eval = F}
+floristic <- utils::read.csv('WiGa_Pilze_Master_20220525_MMM.csv', sep = ',')
+```
+
+We want to keep only the columns of the dataframe, and to change their names to English (to match our ASV taxonomic table): 
+
+```{r, eval = F}
 floristic_clean <- dplyr::select(floristic, Abteilung, Ordnung, Familie, Gattung, Epitheton,
                                  Ökologie, colonized.organ) %>% 
   dplyr::rename(Phylum = Abteilung,
@@ -365,25 +409,41 @@ floristic_clean <- dplyr::select(floristic, Abteilung, Ordnung, Familie, Gattung
                 Species = Epitheton,
                 Ecology = Ökologie,
                 substrate = colonized.organ)
+```
 
-# Subset the dataframe to records coming from soil and change the cell values to soil.  
+We can subset the dataframe down to records coming only from soil and change the cell values to English as well:  
+
+```{r, eval = F}
 floristic_soil <-  dplyr::filter(floristic_clean, substrate == "Erde") %>% 
   mutate(substrate = replace(substrate, substrate == "Erde", "soil"))
+```
 
-# Find overlaps in genera.
+Now we can look for overlaps (e.g. in genera) between the two tables:
+
+```{r, eval = F}
 overlap <- dplyr::intersect(floristic_soil$Genus, fungi_tax_fin$Genus)
 ```
 
 ## 8. Metabarcoding reads vs Sanger reads
 
- * move to the terminal
- 
-```{bash, eval = F}
-# Create a database containing the metabarcoding consensus sequences.
-makeblastdb -in file -parse_seqids -dbtype nucl -out blastdb
+Finally, we may want to compare our consensus sequences to the Sanger sequencing results from the first part of the course. To do this, we can make a local BLAST database out of the metabarcoding consensus sequence FASTA file in the command line using makeblastdb, which is a part of Blast+.
 
-# Compare the sequences to each other and create a match list of sequences that are similar to each other.
-blastn -db blast_db \
+In order to move out of our R environment and back to bash, we type:
+
+```{r,eval = F}
+quit()
+```
+
+Create a database containing the metabarcoding consensus sequences:
+
+```{bash, eval = F}
+makeblastdb -in full_consensus.fasta -parse_seqids -dbtype nucl -out blastdb_full_consensus
+```
+
+Then compare the sequences to each other and create a match list of sequences that are similar to each other:
+
+```{bash, eval = F}
+blastn -db blastdb_full_consensus \
 -outfmt '6 qseqid sseqid pident' \
 -out sanger_meta_comp.txt \
 -qcov_hsp_perc 80 \
