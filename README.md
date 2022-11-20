@@ -1,7 +1,7 @@
 ---
 title: "Teaching Pipeline"
 author: "Lukas Dreyling & Henrique Valim"
-date: "`r Sys.Date()`"
+date: "21.11.2022"
 ---
 
 # 2022 Master's metabarcoding of soil samples from Frankfurt-Riedberg
