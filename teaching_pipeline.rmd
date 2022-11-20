@@ -271,7 +271,7 @@ for folders in consensus_medaka_*; do
     (
         cd "${folders}" || exit ;
         [ ! -f consensus.fasta ] || mv consensus.fasta "${folders}sta"
-        [ ! -f "${folders}sta" ] || mv "${folders}sta" ../../final_seqs
+        [ ! -f "${folders}sta" ] || cp "${folders}sta" ../final_seqs
     )
     fi
     done
