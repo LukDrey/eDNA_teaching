@@ -343,7 +343,7 @@ tax_fungi <- tax_fungi %>%
 Load the fungal reads from the fasta file with the consensus sequences:
 
 ```{R, eval = F}
-fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus.fasta')
+fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus_rename.fasta')
 ```
 
 Make a dataframe of the sequences and their ASV ID:
