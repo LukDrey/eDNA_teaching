@@ -1,6 +1,7 @@
 .Rhistory
 *.sh
 *.fasta
+*.fastq
 *.rds
 *.html
 *.csv

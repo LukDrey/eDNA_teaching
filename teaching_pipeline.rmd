@@ -364,31 +364,31 @@ Split the taxonomy into different columns of taxonomic levels:
 
 ```{R, eval = F}
 fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , sep = '__') %>%
-  tidyr::separate(fungi_tax_fin, Phylum, c(NA, 'Phylum') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Class, c(NA, 'Class') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Order, c(NA, 'Order') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Family, c(NA, 'Family') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Genus, c(NA, 'Genus') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Species, c(NA, 'Species') , sep = '__')
+  tidyr::separate(Phylum, c(NA, 'Phylum') , sep = '__') %>% 
+  tidyr::separate(Class, c(NA, 'Class') , sep = '__') %>% 
+  tidyr::separate(Order, c(NA, 'Order') , sep = '__') %>% 
+  tidyr::separate(Family, c(NA, 'Family') , sep = '__') %>% 
+  tidyr::separate(Genus, c(NA, 'Genus') , sep = '__') %>% 
+  tidyr::separate(Species, c(NA, 'Species') , sep = '__')
 ```
 
-Rename the ASV_ID column:
-
-```{R, eval = F}
-fungi_tax_fin <- dplyr::rename(fungi_tax_fin, ASV_ID = seq_name_fungi)
+Filter out any sequences that are not Fungi: 
+```{r, eval = F}
+fungi_only_tax <- fungi_tax_fin %>% 
+  dplyr::filter(Kingdom == "Fungi")
 ```
 
 Set rownames:
 
 ```{R, eval = F}
-base::row.names(fungi_tax_fin) <- fungi_tax_fin$ASV_ID
+base::row.names(fungi_only_tax) <- fungi_only_tax$ASV_ID
 ```
 
 Finally, remove the sequences and ASV IDs: 
 
 ```{R, eval = F}
-fungi_tax_fin$sequence_fungi <- NULL
-fungi_tax_fin$ASV_ID <- NULL
+fungi_only_tax$sequence_fungi <- NULL
+fungi_only_tax$ASV_ID <- NULL
 ```
 
 We should now have a table with just the taxonomic assignments for each of our ASVs, with their original sequence IDs, in case we want to go back to those sequences later. We can now proceed to compare the results of our metabarcoding approach to the floristic table that has been obtained over several years of manual observation in the plots, and do our own "human vs machine" analysis.
@@ -425,7 +425,7 @@ floristic_soil <-  dplyr::filter(floristic_clean, substrate == "Erde") %>%
 Now we can look for overlaps (e.g. in genera) between the two tables:
 
 ```{r, eval = F}
-overlap <- dplyr::intersect(floristic_soil$Genus, fungi_tax_fin$Genus)
+overlap <- dplyr::intersect(floristic_soil$Genus, fungi_only_tax$Genus)
 ```
 
 ## 8. Metabarcoding reads vs Sanger reads
@@ -441,7 +441,7 @@ quit()
 Create a database containing the metabarcoding consensus sequences:
 
 ```{bash, eval = F}
-makeblastdb -in full_consensus.fasta -parse_seqids -dbtype nucl -out blastdb_full_consensus
+makeblastdb -in final_seqs/full_consensus_rename.fasta -parse_seqids -dbtype nucl -out blastdb_full_consensus
 ```
 
 Then compare the sequences to each other and create a match list of sequences that are similar to each other:
@@ -453,7 +453,7 @@ blastn -db blastdb_full_consensus \
 -qcov_hsp_perc 80 \
 -perc_identity 84 \
 -num_threads 6 \
--query full_consensus.fasta
+-query ./SangerFasta/sanger_seqs.fasta
 ```
 
 

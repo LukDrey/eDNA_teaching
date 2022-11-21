@@ -1,7 +1,7 @@
 ---
 title: "Teaching Pipeline"
 author: "Lukas Dreyling & Henrique Valim"
-date: "21.11.2022"
+date: "`r Sys.Date()`"
 ---
 
 # 2022 Master's metabarcoding of soil samples from Frankfurt-Riedberg
@@ -20,7 +20,7 @@ Below you can see the full list of programs/tools/packages that comprise both th
     + [Racon](https://github.com/isovic/racon): make consensus sequences
     + [Medaka](https://github.com/nanoporetech/medaka): plosih the sequences
  * [Blast+](https://github.com/ncbi/blast_plus_docs): sequence alignment tool
- * [R](https://www.r-project.org/) (and [RStudio](https://posit.co/products/open-source/rstudio/)): statistical software environment
+ * [R[(https://www.r-project.org/)] (and [RStudio](https://posit.co/products/open-source/rstudio/)): statistical software environment
     + [DADA2](https://benjjneb.github.io/dada2/): R package for assigning taxonomy
     
 Another important component of our program list is [conda](https://docs.conda.io/en/latest/), which is a package, dependency, and environment management tool for Unix systems (although it can be used on Windows, too). The two main advantages of conda is 1) to allow you to easily install new programs and tools, and 2) to keep your tools separated into "environments" that can avoid dependency-related problems between different versions of certain packages. This second advantage is something we will see in step 5 of our analysis. 
@@ -343,7 +343,7 @@ tax_fungi <- tax_fungi %>%
 Load the fungal reads from the fasta file with the consensus sequences:
 
 ```{R, eval = F}
-fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus.fasta')
+fungi_seqs_fasta <- Biostrings::readDNAStringSet('full_consensus_rename.fasta')
 ```
 
 Make a dataframe of the sequences and their ASV ID:
@@ -364,31 +364,31 @@ Split the taxonomy into different columns of taxonomic levels:
 
 ```{R, eval = F}
 fungi_tax_fin <- tidyr::separate(tax_clean_fungi, Kingdom, c(NA, 'Kingdom') , sep = '__') %>%
-  tidyr::separate(fungi_tax_fin, Phylum, c(NA, 'Phylum') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Class, c(NA, 'Class') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Order, c(NA, 'Order') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Family, c(NA, 'Family') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Genus, c(NA, 'Genus') , sep = '__') %>% 
-  tidyr::separate(fungi_tax_fin, Species, c(NA, 'Species') , sep = '__')
+  tidyr::separate(Phylum, c(NA, 'Phylum') , sep = '__') %>% 
+  tidyr::separate(Class, c(NA, 'Class') , sep = '__') %>% 
+  tidyr::separate(Order, c(NA, 'Order') , sep = '__') %>% 
+  tidyr::separate(Family, c(NA, 'Family') , sep = '__') %>% 
+  tidyr::separate(Genus, c(NA, 'Genus') , sep = '__') %>% 
+  tidyr::separate(Species, c(NA, 'Species') , sep = '__')
 ```
 
-Rename the ASV_ID column:
-
-```{R, eval = F}
-fungi_tax_fin <- dplyr::rename(fungi_tax_fin, ASV_ID = seq_name_fungi)
+Filter out any sequences that are not Fungi: 
+```{r, eval = F}
+fungi_only_tax <- fungi_tax_fin %>% 
+  dplyr::filter(Kingdom == "Fungi")
 ```
 
 Set rownames:
 
 ```{R, eval = F}
-base::row.names(fungi_tax_fin) <- fungi_tax_fin$ASV_ID
+base::row.names(fungi_only_tax) <- fungi_only_tax$ASV_ID
 ```
 
 Finally, remove the sequences and ASV IDs: 
 
 ```{R, eval = F}
-fungi_tax_fin$sequence_fungi <- NULL
-fungi_tax_fin$ASV_ID <- NULL
+fungi_only_tax$sequence_fungi <- NULL
+fungi_only_tax$ASV_ID <- NULL
 ```
 
 We should now have a table with just the taxonomic assignments for each of our ASVs, with their original sequence IDs, in case we want to go back to those sequences later. We can now proceed to compare the results of our metabarcoding approach to the floristic table that has been obtained over several years of manual observation in the plots, and do our own "human vs machine" analysis.
@@ -425,7 +425,7 @@ floristic_soil <-  dplyr::filter(floristic_clean, substrate == "Erde") %>%
 Now we can look for overlaps (e.g. in genera) between the two tables:
 
 ```{r, eval = F}
-overlap <- dplyr::intersect(floristic_soil$Genus, fungi_tax_fin$Genus)
+overlap <- dplyr::intersect(floristic_soil$Genus, fungi_only_tax$Genus)
 ```
 
 ## 8. Metabarcoding reads vs Sanger reads
@@ -441,7 +441,7 @@ quit()
 Create a database containing the metabarcoding consensus sequences:
 
 ```{bash, eval = F}
-makeblastdb -in full_consensus.fasta -parse_seqids -dbtype nucl -out blastdb_full_consensus
+makeblastdb -in final_seqs/full_consensus_rename.fasta -parse_seqids -dbtype nucl -out blastdb_full_consensus
 ```
 
 Then compare the sequences to each other and create a match list of sequences that are similar to each other:
@@ -453,7 +453,7 @@ blastn -db blastdb_full_consensus \
 -qcov_hsp_perc 80 \
 -perc_identity 84 \
 -num_threads 6 \
--query full_consensus.fasta
+-query ./SangerFasta/sanger_seqs.fasta
 ```
 
 
