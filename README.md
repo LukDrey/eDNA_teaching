@@ -20,7 +20,7 @@ Below you can see the full list of programs/tools/packages that comprise both th
     + [Racon](https://github.com/isovic/racon): make consensus sequences
     + [Medaka](https://github.com/nanoporetech/medaka): plosih the sequences
  * [Blast+](https://github.com/ncbi/blast_plus_docs): sequence alignment tool
- * [R[(https://www.r-project.org/)] (and [RStudio](https://posit.co/products/open-source/rstudio/)): statistical software environment
+ * [R](https://www.r-project.org/)] (and [RStudio](https://posit.co/products/open-source/rstudio/)): statistical software environment
     + [DADA2](https://benjjneb.github.io/dada2/): R package for assigning taxonomy
     
 Another important component of our program list is [conda](https://docs.conda.io/en/latest/), which is a package, dependency, and environment management tool for Unix systems (although it can be used on Windows, too). The two main advantages of conda is 1) to allow you to easily install new programs and tools, and 2) to keep your tools separated into "environments" that can avoid dependency-related problems between different versions of certain packages. This second advantage is something we will see in step 5 of our analysis. 
