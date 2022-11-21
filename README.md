@@ -322,7 +322,7 @@ Next, we set the paths to where the files are stored:
 
 ```{R, eval = F}
 unite.ref <- '/home/evo9-schmitt/Documents/Data/fasta_pass/sh_general_release_dynamic_all_27.10.2022.fasta'
-sequences <- '/home/evo9-schmitt/Documents/Data/full_consensus_rename.fasta'
+sequences <- '/home/evo9-schmitt/Documents/Data/fasta_pass/final_seqs/full_consensus_rename.fasta'
 ```
 
 Here we perform the actual taxonomic assignment using DADA2's assignTaxonomy method:
