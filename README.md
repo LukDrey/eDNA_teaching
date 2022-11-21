@@ -321,7 +321,7 @@ library(Biostrings)
 Next, we set the paths to where the files are stored:
 
 ```{R, eval = F}
-unite.ref <- '/home/evo9-schmitt/Documents/Data/sh_general_release_dynamic_27.10.2022.fasta'
+unite.ref <- '/home/evo9-schmitt/Documents/Data/fasta_pass/sh_general_release_dynamic_all_27.10.2022.fasta'
 sequences <- '/home/evo9-schmitt/Documents/Data/full_consensus_rename.fasta'
 ```
 
