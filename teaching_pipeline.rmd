@@ -18,7 +18,7 @@ Below you can see the full list of programs/tools/packages that comprise both th
     + [CD-HIT](https://sites.google.com/view/cd-hit); clustering Reads 
     + [Minimap2](https://github.com/lh3/minimap2): align reads
     + [Racon](https://github.com/isovic/racon): make consensus sequences
-    + [Medaka](https://github.com/nanoporetech/medaka): plosih the sequences
+    + [Medaka](https://github.com/nanoporetech/medaka): polish the sequences
  * [Blast+](https://github.com/ncbi/blast_plus_docs): sequence alignment tool
  * [R[(https://www.r-project.org/)] (and [RStudio](https://posit.co/products/open-source/rstudio/)): statistical software environment
     + [DADA2](https://benjjneb.github.io/dada2/): R package for assigning taxonomy
@@ -75,7 +75,7 @@ First, we move into the directory where the fastq files that passed the initial 
 cd fastq_pass 
 ```
 
-Unzip the files:
+Unzip the files: (we don't need to do that today)
 
 ```{bash, eval = F}
 gzip *.gz
@@ -85,6 +85,12 @@ Make one big fastq file for processing by pasting the sequences together:
 
 ```{bash, eval = F}
 cat *.fastq > ../full_sequences.fastq
+```
+
+Then we activate the conda environment where all the programs are installed:
+
+```{bash, eval = F}
+conda activate master_class
 ```
 
 Then we make a big FASTQ file and filter it based on the quality score, as well as the minimum and maximum length of the reads:
@@ -138,12 +144,6 @@ To begin, enter the folder where we stored the FASTA files:
 
 ```{bash, eval = F}
 cd fasta_pass
-```
-
-Then we activate the conda environment where all the programs are installed:
-
-```{bash, eval = F}
-conda activate master_class
 ```
 
 Sub sample sequences so we can run all commands locally:
