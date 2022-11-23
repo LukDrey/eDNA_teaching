@@ -130,7 +130,10 @@ Let's compare how many sequences we filtered out:
 grep -c '^>' *.fasta | less
 ```
 
-> How many reads have been filtered out, roughly, as a percentage? How much data have we lost based on our quality filtering?
+>
+> - How many reads have been filtered out, roughly, as a percentage? 
+> - How much data have we lost based on our quality filtering?
+>
 
 Now we can move the FASTA files to the folder we created before.
 
@@ -178,7 +181,11 @@ for clstr in *.clstr ; do
     done
 ```    
 
-> What do you notice about these cluster sizes? Is there anything interesting about the pattern, i.e. are there many more small clusters, or many very large clusters? What would it mean to have 100% of our clusters be of size 1, or to have most or all of our clusters be very large?
+>
+> - What do you notice about these cluster sizes? 
+> - Is there anything interesting about the pattern, i.e. are there many more small clusters, or many very large clusters? 
+> - What would it mean to have 100% of our clusters be of size 1, or to have most or all of our clusters be very large?
+>
 
 We can then create FASTA files with clusters of a certain size: 
 
@@ -432,7 +439,11 @@ Now we can look for overlaps (e.g. in genera) between the two tables:
 overlap <- dplyr::intersect(floristic_soil$Genus, fungi_only_tax$Genus)
 ```
 
-> What does this overlap between the two tables tell us? What might it mean e.g. to have a very high vs a very low amount of overlap between these two tables, one machine- (i.e. sequencing) generated and the other human-generated? What do you think could lead to a lower overlap between these tables?
+>
+> - What does this overlap between the two tables tell us? 
+> - What might it mean e.g. to have a very high vs a very low amount of overlap between these two tables, one machine- (i.e. sequencing) generated and the other human-generated? 
+> - What do you think could lead to a lower overlap between these tables?
+>
 
 ## 8. Metabarcoding reads vs Sanger reads
 
@@ -468,6 +479,9 @@ You can now look directly at this file to see which sequences produced hits abov
 cat sanger_meta_comp.txt 
 ```
 
-> Think about the Sanger sequencing data you produced earlier in the course. How many sequences, taxa, and unique individuals should be represented in that dataset? How many of these have been matched above 84% identity to the sequencing dataset we have produced? 
+>
+> - Think about the Sanger sequencing data you produced earlier in the course. How many sequences, taxa, and unique individuals should be represented in that dataset? 
+> - How many of these have been matched above 84% identity to the sequencing dataset we have produced? 
+> 
 
 
